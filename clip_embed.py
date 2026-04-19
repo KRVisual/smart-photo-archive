@@ -1,47 +1,52 @@
-import clip
-import torch
-from PIL import Image
-import os
 import sqlite3
-import pickle
+import torch
+import clip
+import numpy as np
+from PIL import Image
+
+DB_NAME = "photos.db"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model, preprocess = clip.load("ViT-B/32", device=device)
 
-def add_embeddings_column():
-    conn = sqlite3.connect('photos.db')
-    cursor = conn.cursor()
-    try:
-        cursor.execute('ALTER TABLE photos ADD COLUMN embedding BLOB')
-        conn.commit()
-    except:
-        pass
-    conn.close()
+def get_connection():
+    return sqlite3.connect(DB_NAME)
 
-def save_embedding(filename, embedding):
-    conn = sqlite3.connect('photos.db')
+def get_image_embedding(image_path):
+    image = preprocess(Image.open(image_path)).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        features = model.encode_image(image)
+
+    features /= features.norm(dim=-1, keepdim=True)
+    return features.cpu().numpy().astype(np.float32)[0]
+
+def update_embeddings():
+    conn = get_connection()
     cursor = conn.cursor()
-    embedding_bytes = pickle.dumps(embedding)
-    cursor.execute('UPDATE photos SET embedding = ? WHERE filename = ?', 
-                   (embedding_bytes, filename))
+
+    cursor.execute("SELECT id, filepath FROM photos")
+    rows = cursor.fetchall()
+
+    for photo_id, filepath in rows:
+        try:
+            embedding = get_image_embedding(filepath)
+            embedding_bytes = embedding.tobytes()
+
+            cursor.execute("""
+                UPDATE photos
+                SET embedding = ?
+                WHERE id = ?
+            """, (embedding_bytes, photo_id))
+
+            print(f"✓ Embedded: {filepath}")
+
+        except Exception as e:
+            print(f"✗ Failed: {filepath} -> {e}")
+
     conn.commit()
     conn.close()
+    print("\nAll embeddings saved!")
 
-def embed_all_photos(folder_path):
-    add_embeddings_column()
-    
-    for filename in os.listdir(folder_path):
-        if filename.lower().endswith(('.jpg', '.jpeg')):
-            full_path = os.path.join(folder_path, filename)
-            
-            image = preprocess(Image.open(full_path)).unsqueeze(0).to(device)
-            
-            with torch.no_grad():
-                embedding = model.encode_image(image).cpu().numpy()
-            
-            save_embedding(filename, embedding)
-            print(f"✓ Embedded: {filename}")
-    
-    print("\nAll photos embedded and saved to database!")
-
-embed_all_photos('photos')
+if __name__ == "__main__":
+    update_embeddings()
