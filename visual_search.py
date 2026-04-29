@@ -20,6 +20,14 @@ def get_connection():
     return sqlite3.connect(DB_NAME)
 
 
+def safe_image_path(filepath):
+    photos_root = os.path.abspath("photos")
+    full_path = os.path.abspath(os.path.normpath(filepath))
+    if not full_path.startswith(photos_root):
+        return None
+    return full_path
+
+
 def clean_value(value):
     if value is None:
         return "Not available in this file"
@@ -190,13 +198,17 @@ with tab1:
             cols = st.columns(2)
             for i, match in enumerate(matches):
                 with cols[i % 2]:
+                    safe_path = safe_image_path(match["filepath"])
                     try:
-                        image = Image.open(os.path.normpath(match["filepath"]))
-                        st.image(
-                            image,
-                            caption=f"{match['filename']} — {match['score'] * 100:.1f}% match",
-                            use_container_width=True
-                        )
+                        if safe_path is None:
+                            st.error(f"Invalid path: {match['filepath']}")
+                        else:
+                            image = Image.open(safe_path)
+                            st.image(
+                                image,
+                                caption=f"{match['filename']} — {match['score'] * 100:.1f}% match",
+                                use_container_width=True
+                            )
                     except Exception as e:
                         st.error(f"Could not open image: {match['filepath']}")
                         st.write(str(e))
@@ -223,9 +235,13 @@ with tab2:
             cols = st.columns(min(len(cluster), 3))
             for i, photo in enumerate(cluster):
                 with cols[i % 3]:
+                    safe_path = safe_image_path(photo["filepath"])
                     try:
-                        image = Image.open(os.path.normpath(photo["filepath"]))
-                        st.image(image, caption=photo["filename"], use_container_width=True)
+                        if safe_path is None:
+                            st.error(f"Invalid path: {photo['filename']}")
+                        else:
+                            image = Image.open(safe_path)
+                            st.image(image, caption=photo["filename"], use_container_width=True)
                     except Exception as e:
                         st.error(f"Could not open: {photo['filename']}")
 
@@ -239,12 +255,16 @@ with tab3:
     cols = st.columns(3)
     for i, photo in enumerate(best):
         with cols[i % 3]:
+            safe_path = safe_image_path(photo["filepath"])
             try:
-                image = Image.open(os.path.normpath(photo["filepath"]))
-                st.image(
-                    image,
-                    caption=f"{photo['filename']} — {photo['score']*100:.1f}%",
-                    use_container_width=True
-                )
+                if safe_path is None:
+                    st.error(f"Invalid path: {photo['filename']}")
+                else:
+                    image = Image.open(safe_path)
+                    st.image(
+                        image,
+                        caption=f"{photo['filename']} — {photo['score']*100:.1f}%",
+                        use_container_width=True
+                    )
             except Exception as e:
                 st.error(f"Could not open: {photo['filename']}")
