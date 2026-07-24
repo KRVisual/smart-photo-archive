@@ -834,14 +834,16 @@ def main() -> None:
     print(
         f"New:        {result.indexed}"
     )
-    print(f"Updated:    {result.updated}")
-    print(f"Moved:      {result.moved}")
-    print(f"Missing:    {result.missing}")
-    print(f"Skipped:    {result.skipped}")
-    print(f"Failed:     {result.failed}")
+    print(
+        f"Updated:    {result.updated}"
+    )
+    print(
+        f"Skipped:    {result.skipped}"
+    )
+    print(
+        f"Failed:     {result.failed}"
+    )
 
 
 if __name__ == "__main__":
     main()
-
-
